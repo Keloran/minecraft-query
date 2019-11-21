@@ -8,29 +8,29 @@ import (
 )
 
 func TestPing(t *testing.T) {
-	tests := []struct{
-		name string
-		mc minecraft.Minecraft
-		expect minecraft.ServerInfo
-		err error
+	tests := []struct {
+		name   string
+		mc     minecraft.Minecraft
+		expect minecraft.PingInfo
+		err    error
 	}{
 		{
 			name: "query",
 			mc: minecraft.Minecraft{
 				Address: "localhost",
-				Port: 25565,
+				Port:    25565,
 				Timeout: 10,
 			},
-			expect: minecraft.ServerInfo{
+			expect: minecraft.PingInfo{
 				Description: minecraft.Description{
 					Name: "A Minecraft Server",
 				},
 				Players: minecraft.Players{
-					Max: 20,
+					Max:    20,
 					Online: 0,
 				},
 				Version: minecraft.Version{
-					Version: "1.14.4",
+					Version:  "1.14.4",
 					Protocol: 498,
 				},
 			},
@@ -52,9 +52,8 @@ func TestPing(t *testing.T) {
 			passed = assert.Equal(t, test.expect, ret)
 			if !passed {
 				test.mc.Disconnect()
-				t.Errorf("test: %v", test)
+				t.Errorf("test: %v -- ret: %v", test, ret)
 			}
 		})
 	}
 }
-

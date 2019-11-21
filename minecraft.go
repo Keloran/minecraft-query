@@ -3,36 +3,74 @@ package minecraft
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"time"
-	"errors"
 )
 
 type Minecraft struct {
-	Socket string
+	Socket  string
 	Address string
-	Port int
+	Port    int
 	Timeout int
-	Conn net.Conn
+	Conn    net.Conn
 }
 
 type Description struct {
 	Name string `json:"text"`
 }
 type Players struct {
-	Max int `json:"max"`
+	Max    int `json:"max"`
 	Online int `json:"online"`
 }
 type Version struct {
-	Version string `json:"name"`
-	Protocol int `json:"protocol"`
+	Version  string `json:"name"`
+	Protocol int    `json:"protocol"`
+}
+
+type Plugin struct {
+	Name string `json:"name"`
+}
+
+type Player struct {
+	Name string `json:"name"`
+}
+
+type PingInfo struct {
+	Description `json:"description"`
+	Players     `json:"players"`
+	Version     `json:"version"`
+}
+
+type HostInfo struct {
+	Name string `json:"name"`
+	Port int `json:"port"`
+	IP string `json:"ip"`
+}
+
+type GameInfo struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+	Map string `json:"map"`
+}
+
+type PlayerInfo struct {
+	Max int `json:"max"`
+	Online int `json:"online"`
 }
 
 type ServerInfo struct {
-	Description `json:"description"`
-	Players `json:"players"`
+	HostInfo `json:"host"`
 	Version `json:"version"`
+	PlayerInfo `json:"player"`
+}
+
+type QueryInfo struct {
+	ServerInfo `json:"server"`
+	GameInfo `json:"game"`
+	Players []Player `json:"players"`
+	Plugins []Plugin `json:"plugins"`
 }
 
 func (m Minecraft) Resolve() error {
@@ -53,7 +91,7 @@ func ip2long(ip string) uint32 {
 }
 
 func (m Minecraft) ConnectTCP() (Minecraft, error) {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout) * time.Second)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout)*time.Second)
 	if err != nil {
 		fmt.Println(fmt.Errorf("connect: %v, %w", m, err))
 		return m, errors.New("invalid address")
@@ -64,7 +102,7 @@ func (m Minecraft) ConnectTCP() (Minecraft, error) {
 }
 
 func (m Minecraft) ConnectUDP() (Minecraft, error) {
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout) * time.Second)
+	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout)*time.Second)
 	if err != nil {
 		fmt.Println(fmt.Errorf("connect: %v, %w", m, err))
 		return m, errors.New("invalid address")
@@ -84,4 +122,3 @@ func (m Minecraft) Disconnect() error {
 
 	return nil
 }
-

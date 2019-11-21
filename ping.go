@@ -9,22 +9,22 @@ import (
 	"io"
 )
 
-func (m Minecraft) Ping(resolve bool) (ServerInfo, error) {
+func (m Minecraft) Ping(resolve bool) (PingInfo, error) {
 	if m.Conn == nil {
-		return ServerInfo{}, fmt.Errorf("no connection")
+		return PingInfo{}, fmt.Errorf("no connection")
 	}
 
 	if resolve {
 		err := m.Resolve()
 		if err != nil {
-			return ServerInfo{}, fmt.Errorf("Ping Resolve: %w", err)
+			return PingInfo{}, fmt.Errorf("Ping Resolve: %w", err)
 		}
 	}
 
 	return m.pingQuery()
 }
 
-func (m Minecraft) pingQuery() (ServerInfo, error) {
+func (m Minecraft) pingQuery() (PingInfo, error) {
 	var buf, buff bytes.Buffer
 	binary.Write(&buf, binary.LittleEndian, []byte("\x00\x04"))
 	binary.Write(&buf, binary.LittleEndian, []byte(string(len(m.Address))))
@@ -37,7 +37,7 @@ func (m Minecraft) pingQuery() (ServerInfo, error) {
 
 	_, err := m.Conn.Write(buff.Bytes())
 	if err != nil {
-		return ServerInfo{}, fmt.Errorf("handshake write: %w", err)
+		return PingInfo{}, fmt.Errorf("handshake write: %w", err)
 	}
 	buff.Reset()
 	buf.Reset()
@@ -46,16 +46,15 @@ func (m Minecraft) pingQuery() (ServerInfo, error) {
 	z, err := r.ReadBytes('\n')
 	if err != nil {
 		if err != io.EOF {
-			return ServerInfo{}, fmt.Errorf("read byte buffer: %w", err)
+			return PingInfo{}, fmt.Errorf("read byte buffer: %w", err)
 		}
 	}
 
-	j := ServerInfo{}
+	j := PingInfo{}
 	err = json.Unmarshal(z[3:], &j)
 	if err != nil {
-		return ServerInfo{}, fmt.Errorf("unmarshal json: %w", err)
+		return PingInfo{}, fmt.Errorf("unmarshal json: %w", err)
 	}
 
 	return j, nil
 }
-

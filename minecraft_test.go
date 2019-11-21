@@ -9,16 +9,16 @@ import (
 )
 
 func TestConnectTCP(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name string
-		mc minecraft.Minecraft
-		err error
+		mc   minecraft.Minecraft
+		err  error
 	}{
 		{
 			name: "LocalHost",
 			mc: minecraft.Minecraft{
 				Address: "localhost",
-				Port: 25565,
+				Port:    25565,
 				Timeout: 10,
 			},
 		},
@@ -26,7 +26,7 @@ func TestConnectTCP(t *testing.T) {
 			name: "Failed",
 			mc: minecraft.Minecraft{
 				Address: "localhost",
-				Port: 9999,
+				Port:    9999,
 				Timeout: 10,
 			},
 			err: fmt.Errorf("invalid address"),
@@ -49,16 +49,16 @@ func TestConnectTCP(t *testing.T) {
 }
 
 func TestConnectUDP(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name string
-		mc minecraft.Minecraft
-		err error
+		mc   minecraft.Minecraft
+		err  error
 	}{
 		{
 			name: "LocalHost",
 			mc: minecraft.Minecraft{
 				Address: "localhost",
-				Port: 25565,
+				Port:    25565,
 				Timeout: 10,
 			},
 		},
@@ -78,4 +78,3 @@ func TestConnectUDP(t *testing.T) {
 		})
 	}
 }
-
