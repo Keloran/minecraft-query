@@ -250,7 +250,7 @@ func getPluginNameAndVersion(pl []byte) Plugin {
 	}
 
 	p.Name = string(pl[0:versionStart])
-	p.Version = string(pl[versionStart:])
+	p.Version = string(pl[versionStart+1:])
 
 	return p
 }
