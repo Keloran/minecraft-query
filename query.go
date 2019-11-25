@@ -6,8 +6,8 @@ import (
 	//	"encoding/hex"
 	"fmt"
 	"io"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 func (m Minecraft) Query() (interface{}, error) {
@@ -23,21 +23,28 @@ func (m Minecraft) Query() (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
-//	fmt.Println(fmt.Sprintf("Status: %v", status))
 
 	return status, nil
 }
 
 func (m Minecraft) GetChallenge() (int32, error) {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
-	binary.Write(&buf, binary.BigEndian, []byte("\x09"))
-	binary.Write(&buf, binary.BigEndian, uint32(1))
-	_, err := m.Conn.Write(buf.Bytes())
+	err := binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
+	if err != nil {
+	    return 0, fmt.Errorf("challenge magic: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, []byte("\x09"))
+	if err != nil {
+	    return 0, fmt.Errorf("challenge type: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, []byte{01, 02, 03, 04})
+	if err != nil {
+	    return 0, fmt.Errorf("challange session: %w", err)
+    }
+	_, err = m.Conn.Write(buf.Bytes())
 	if err != nil {
 		return 0, fmt.Errorf("challange write: %w", err)
 	}
-	// fmt.Println(fmt.Sprintf(hex.EncodeToString(buf.Bytes())))
 
 	out := make([]byte, 12)
 	_, err = io.ReadFull(m.Conn, out)
@@ -49,8 +56,8 @@ func (m Minecraft) GetChallenge() (int32, error) {
 
 	preChal := out[5:]
 	chal := preChal
-	if chal[len(chal) - 1] == byte(00) {
-		chal = chal[0:len(chal) - 2]
+	if chal[len(chal)-1] == byte(00) {
+		chal = chal[0 : len(chal)-2]
 	}
 
 	ret, err := strconv.Atoi(string(chal))
@@ -63,16 +70,30 @@ func (m Minecraft) GetChallenge() (int32, error) {
 
 func (m Minecraft) GetStatus(challenge int32) (interface{}, error) {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
-	binary.Write(&buf, binary.BigEndian, []byte("\x00"))
-	binary.Write(&buf, binary.BigEndian, uint32(1))
-	binary.Write(&buf, binary.BigEndian, challenge)
-	binary.Write(&buf, binary.BigEndian, []byte("\x00\x00\x00\x00"))
-	_, err := m.Conn.Write(buf.Bytes())
+	err := binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
+	if err != nil {
+	    return nil, fmt.Errorf("getstatus magic: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, []byte("\x00"))
+	if err != nil {
+	    return nil, fmt.Errorf("getstatus type: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, []byte{01, 02, 03, 04})
+	if err != nil {
+	    return nil, fmt.Errorf("getstatus session: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, challenge)
+	if err != nil {
+	    return nil, fmt.Errorf("getstatus challange: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, []byte("\x00\x00\x00\x00"))
+	if err != nil {
+	    return nil, fmt.Errorf("getstatus fullstat: %w", err)
+    }
+	_, err = m.Conn.Write(buf.Bytes())
 	if err != nil {
 		return "", fmt.Errorf("status write: %w", err)
 	}
-//	fmt.Println(fmt.Sprintf("status write: %x", buf.Bytes()))
 
 	out := make([]byte, 1024)
 	_, err = io.ReadAtLeast(m.Conn, out, 5)
@@ -86,8 +107,6 @@ func (m Minecraft) GetStatus(challenge int32) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("status serverinfo: %w", err)
 	}
-
-//	fmt.Println(fmt.Sprintf("si: %+v", si))
 
 	return si, nil
 }
@@ -109,52 +128,52 @@ func getServerInfo(stat []byte) (QueryInfo, error) {
 
 	for i, info := range data {
 		switch info {
-			// HostInfo
-			case "hostname":
-				q.ServerInfo.HostInfo.Name = data[i+1]
-			case "hostport":
-				port, _ := strconv.Atoi(data[i+1])
-				q.ServerInfo.HostInfo.Port = port
-			case "hostip":
-				q.ServerInfo.HostInfo.IP = data[i+1]
+		// HostInfo
+		case "hostname":
+			q.ServerInfo.HostInfo.Name = data[i+1]
+		case "hostport":
+			port, _ := strconv.Atoi(data[i+1])
+			q.ServerInfo.HostInfo.Port = port
+		case "hostip":
+			q.ServerInfo.HostInfo.IP = data[i+1]
 
-			// Version
-			case "version":
-				q.ServerInfo.Version.Version = data[i+1]
+		// Version
+		case "version":
+			q.ServerInfo.Version.Version = data[i+1]
 
-			// Plugins
-			case "plugins":
-				plugins, err := getPlugins(stat)
+		// Plugins
+		case "plugins":
+			plugins, err := getPlugins(stat)
+			if err != nil {
+				return q, fmt.Errorf("serverinfo plugins: %w", err)
+			}
+			q.Plugins = plugins
+
+		// PlayerInfo
+		case "numplayers":
+			online, _ := strconv.Atoi(data[i+1])
+			q.ServerInfo.PlayerInfo.Online = online
+		case "maxplayers":
+			max, _ := strconv.Atoi(data[i+1])
+			q.ServerInfo.PlayerInfo.Max = max
+
+		// GameInfo
+		case "gametype":
+			q.GameInfo.Type = data[i+1]
+		case "game_id":
+			q.GameInfo.Name = data[i+1]
+		case "map":
+			q.GameInfo.Map = data[i+1]
+
+		// Players
+		case "player_":
+			if len(info) != 0 {
+				players, err := getPlayers(stat)
 				if err != nil {
-					return q, fmt.Errorf("serverinfo plugins: %w", err)
+					return q, fmt.Errorf("serverinfo players: %w", err)
 				}
-				q.Plugins = plugins
-
-			// PlayerInfo
-			case "numplayers":
-				online, _ := strconv.Atoi(data[i+1])
-				q.ServerInfo.PlayerInfo.Online = online
-			case "maxplayers":
-				max, _ := strconv.Atoi(data[i+1])
-				q.ServerInfo.PlayerInfo.Max = max
-
-			// GameInfo
-			case "gametype":
-				q.GameInfo.Type = data[i+1]
-			case "game_id":
-				q.GameInfo.Name = data[i+1]
-			case "map":
-				q.GameInfo.Map = data[i+1]
-
-			// Players
-			case "player_":
-				if len(info) != 0 {
-					players, err := getPlayers(stat)
-					if err != nil {
-						return q, fmt.Errorf("serverinfo players: %w", err)
-					}
-					q.Players = players
-				}
+				q.Players = players
+			}
 		}
 
 		if strings.Contains(info, "player_") {
@@ -165,9 +184,6 @@ func getServerInfo(stat []byte) (QueryInfo, error) {
 			q.Players = players
 		}
 	}
-
-//	fmt.Println(fmt.Sprintf("data: %v", data))
-//	fmt.Println(fmt.Sprintf("Q: %+v", q))
 
 	return q, nil
 }
@@ -182,20 +198,20 @@ func getPlugins(stat []byte) ([]Plugin, error) {
 	pluginEnd := 0
 
 	for n, i := range stat {
-		if (i == pluginBytes[0] &&
-		stat[n] == pluginBytes[0] &&
-		stat[n+1] == pluginBytes[1] &&
-		stat[n+2] == pluginBytes[2] &&
-		stat[n+3] == pluginBytes[3] &&
-		stat[n+4] == pluginBytes[4] &&
-		stat[n+5] == pluginBytes[5] &&
-		stat[n+6] == pluginBytes[6]) {
-			pluginFrom = n+7
+		if i == pluginBytes[0] &&
+			stat[n] == pluginBytes[0] &&
+			stat[n+1] == pluginBytes[1] &&
+			stat[n+2] == pluginBytes[2] &&
+			stat[n+3] == pluginBytes[3] &&
+			stat[n+4] == pluginBytes[4] &&
+			stat[n+5] == pluginBytes[5] &&
+			stat[n+6] == pluginBytes[6] {
+			pluginFrom = n + 7
 		}
 
 		if i == postBytes[0] {
 			if stat[n] == postBytes[0] && stat[n+1] == postBytes[1] && stat[n+2] == postBytes[2] {
-				pluginEnd = n-1
+				pluginEnd = n - 1
 			}
 		}
 	}
@@ -204,10 +220,10 @@ func getPlugins(stat []byte) ([]Plugin, error) {
 	endbucket := []byte{84, 58, 32}
 
 	for n, i := range pluginBytes {
-		if (i == endbucket[0] &&
-		pluginBytes[n+1] == endbucket[1] &&
-		pluginBytes[n+2] == endbucket[2]) {
-			pluginFrom = n+3
+		if i == endbucket[0] &&
+			pluginBytes[n+1] == endbucket[1] &&
+			pluginBytes[n+2] == endbucket[2] {
+			pluginFrom = n + 3
 		}
 	}
 	pluginBytes = pluginBytes[pluginFrom:]
@@ -218,14 +234,14 @@ func getPlugins(stat []byte) ([]Plugin, error) {
 	semi := byte(59)
 	for n, i := range pluginBytes {
 		if i == semi {
-			plEnd = n-1
+			plEnd = n - 1
 
 			pr = append(pr, getPluginNameAndVersion(pluginBytes[plStart:plEnd]))
 
-			plStart = n+2
+			plStart = n + 2
 		}
 
-		if n == len(pluginBytes) - 1 {
+		if n == len(pluginBytes)-1 {
 			pr = append(pr, getPluginNameAndVersion(pluginBytes[plStart:]))
 		}
 	}
@@ -256,19 +272,19 @@ func getPluginNameAndVersion(pl []byte) Plugin {
 }
 
 func getPlayers(stat []byte) ([]Player, error) {
-	playerBytes := []byte{112, 108, 97, 121, 101, 114, 95} 
+	playerBytes := []byte{112, 108, 97, 121, 101, 114, 95}
 	plr := []Player{}
-	
+
 	playerStart := 0
 	for n, i := range stat {
-		if (i == playerBytes[0] &&
-		stat[n+1] == playerBytes[1] &&
-		stat[n+2] == playerBytes[2] &&
-		stat[n+3] == playerBytes[3] &&
-		stat[n+4] == playerBytes[4] &&
-		stat[n+5] == playerBytes[5] &&
-		stat[n+6] == playerBytes[6]) {
-			playerStart = n+7
+		if i == playerBytes[0] &&
+			stat[n+1] == playerBytes[1] &&
+			stat[n+2] == playerBytes[2] &&
+			stat[n+3] == playerBytes[3] &&
+			stat[n+4] == playerBytes[4] &&
+			stat[n+5] == playerBytes[5] &&
+			stat[n+6] == playerBytes[6] {
+			playerStart = n + 7
 			break
 		}
 	}
@@ -286,4 +302,3 @@ func getPlayers(stat []byte) ([]Player, error) {
 
 	return plr, nil
 }
-

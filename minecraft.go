@@ -15,6 +15,7 @@ type Minecraft struct {
 	Port    int
 	Timeout int
 	Conn    net.Conn
+	Session int
 }
 
 type Description struct {
@@ -30,7 +31,7 @@ type Version struct {
 }
 
 type Plugin struct {
-	Name string `json:"name"`
+	Name    string `json:"name"`
 	Version string `json:"version"`
 }
 
@@ -46,32 +47,32 @@ type PingInfo struct {
 
 type HostInfo struct {
 	Name string `json:"name"`
-	Port int `json:"port"`
-	IP string `json:"ip"`
+	Port int    `json:"port"`
+	IP   string `json:"ip"`
 }
 
 type GameInfo struct {
 	Type string `json:"type"`
 	Name string `json:"name"`
-	Map string `json:"map"`
+	Map  string `json:"map"`
 }
 
 type PlayerInfo struct {
-	Max int `json:"max"`
+	Max    int `json:"max"`
 	Online int `json:"online"`
 }
 
 type ServerInfo struct {
-	HostInfo `json:"host"`
-	Version `json:"version"`
+	HostInfo   `json:"host"`
+	Version    `json:"version"`
 	PlayerInfo `json:"player"`
 }
 
 type QueryInfo struct {
 	ServerInfo `json:"server"`
-	GameInfo `json:"game"`
-	Players []Player `json:"players"`
-	Plugins []Plugin `json:"plugins"`
+	GameInfo   `json:"game"`
+	Players    []Player `json:"players"`
+	Plugins    []Plugin `json:"plugins"`
 }
 
 func (m Minecraft) Resolve() error {
@@ -79,22 +80,22 @@ func (m Minecraft) Resolve() error {
 		return fmt.Errorf("Invalid IP")
 	}
 
-	// record := net.LookupSVR("_minecraft._tcp", "tcp", m.ServerAddress)
-	// fmt.Println(record)
-
 	return nil
 }
 
 func ip2long(ip string) uint32 {
 	var long uint32
-	binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
+	err := binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
+	if err != nil {
+	    fmt.Printf("ip2long read: %v", err)
+    }
 	return long
 }
 
 func (m Minecraft) ConnectTCP() (Minecraft, error) {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout)*time.Second)
 	if err != nil {
-		fmt.Println(fmt.Errorf("connect: %v, %w", m, err))
+		fmt.Printf("connect: %v, %v\n", m, err)
 		return m, errors.New("invalid address")
 	}
 	m.Conn = conn
@@ -105,7 +106,7 @@ func (m Minecraft) ConnectTCP() (Minecraft, error) {
 func (m Minecraft) ConnectUDP() (Minecraft, error) {
 	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout)*time.Second)
 	if err != nil {
-		fmt.Println(fmt.Errorf("connect: %v, %w", m, err))
+		fmt.Printf("connect: %v, %v\n", m, err)
 		return m, errors.New("invalid address")
 	}
 	m.Conn = conn

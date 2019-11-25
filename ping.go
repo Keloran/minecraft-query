@@ -26,16 +26,28 @@ func (m Minecraft) Ping(resolve bool) (PingInfo, error) {
 
 func (m Minecraft) pingQuery() (PingInfo, error) {
 	var buf, buff bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, []byte("\x00\x04"))
-	binary.Write(&buf, binary.LittleEndian, []byte(string(len(m.Address))))
-	binary.Write(&buf, binary.LittleEndian, []byte(m.Address))
-	binary.Write(&buf, binary.BigEndian, uint16(m.Port))
-	binary.Write(&buf, binary.LittleEndian, []byte("\x01"))
+	err := binary.Write(&buf, binary.LittleEndian, []byte{00, 04})
+	if err != nil {
+	    return PingInfo{}, fmt.Errorf("pingQuery magic: %w", err)
+    }
+	err = binary.Write(&buf, binary.LittleEndian, []byte(string(len(m.Address))))
+	if err != nil {
+	    return PingInfo{}, fmt.Errorf("pingQuery address length: %w", err)
+    }
+	err = binary.Write(&buf, binary.LittleEndian, []byte(m.Address))
+	if err != nil {
+	    return PingInfo{}, fmt.Errorf("pingQuery address: %w", err)
+    }
+	err = binary.Write(&buf, binary.BigEndian, uint16(m.Port))
+	if err != nil {
+	    return PingInfo{}, fmt.Errorf("pingQuery port: %w", err)
+    }
+	binary.Write(&buf, binary.LittleEndian, []byte{01})
 	binary.Write(&buff, binary.LittleEndian, []byte(string(buf.Len())))
 	binary.Write(&buff, binary.LittleEndian, buf.Bytes())
-	binary.Write(&buff, binary.LittleEndian, []byte("\x01\x00"))
+	binary.Write(&buff, binary.LittleEndian, []byte{01, 00})
 
-	_, err := m.Conn.Write(buff.Bytes())
+	_, err = m.Conn.Write(buff.Bytes())
 	if err != nil {
 		return PingInfo{}, fmt.Errorf("handshake write: %w", err)
 	}
