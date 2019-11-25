@@ -31,6 +31,7 @@ type Version struct {
 
 type Plugin struct {
 	Name string `json:"name"`
+	Version string `json:"version"`
 }
 
 type Player struct {
