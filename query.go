@@ -79,7 +79,6 @@ func (m Minecraft) GetChallenge() (int32, error) {
 
 		challenge<- int32(ret)
 		e <- nil
-		return
 	}()
 
 	select {
@@ -92,8 +91,6 @@ func (m Minecraft) GetChallenge() (int32, error) {
 		case <-time.After(time.Duration(m.Timeout) * time.Second):
 			return 0, fmt.Errorf("challenge timeout, length: %d", m.Timeout)
 	}
-
-	return 0, nil
 }
 
 func (m Minecraft) GetStatus(challenge int32) (QueryInfo, error) {
@@ -143,10 +140,9 @@ func (m Minecraft) GetStatus(challenge int32) (QueryInfo, error) {
 			ret <- QueryInfo{}
 			return
 		}
-		
+
 		e <- nil
 		ret <- si
-		return
 	}()
 
 	select {
@@ -156,8 +152,6 @@ func (m Minecraft) GetStatus(challenge int32) (QueryInfo, error) {
 		case <- time.After(time.Duration(m.Timeout) * time.Second):
 			return QueryInfo{}, fmt.Errorf("status timeout, length: %d\n", m.Timeout)
 	}
-
-	return QueryInfo{}, nil
 }
 
 func getServerInfo(stat []byte) (QueryInfo, error) {

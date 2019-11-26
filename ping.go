@@ -16,8 +16,8 @@ func (m Minecraft) Ping(resolve bool) (PingInfo, error) {
 	}
 
 	// timeout set to min of 30 seconds
-	if m.Timeout < 30 {
-		m.Timeout = 30
+	if m.Timeout < 60 {
+		m.Timeout = 60
 	}
 
 	if resolve {
@@ -109,6 +109,4 @@ func (m Minecraft) pingQuery() (PingInfo, error) {
 		case <- time.After(time.Duration(m.Timeout) * time.Second):
 			return PingInfo{}, fmt.Errorf("ping timeout, length: %d", m.Timeout)
 	}
-
-	return j, nil
 }
