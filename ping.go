@@ -15,6 +15,11 @@ func (m Minecraft) Ping(resolve bool) (PingInfo, error) {
 		return PingInfo{}, fmt.Errorf("no connection")
 	}
 
+	// timeout set to min of 30 seconds
+	if m.Timeout < 30 {
+		m.Timeout = 30
+	}
+
 	if resolve {
 		err := m.Resolve()
 		if err != nil {
@@ -59,6 +64,7 @@ func (m Minecraft) pingQuery() (PingInfo, error) {
 	if err != nil {
 		return PingInfo{}, fmt.Errorf("pingQuery status ping: %w", err)
 	}
+	buf.Reset()
 
 	ret := make(chan []byte, 1)
 	e := make(chan error, 1)
@@ -69,10 +75,8 @@ func (m Minecraft) pingQuery() (PingInfo, error) {
 			e <- fmt.Errorf("handshake write: %w", err)
 			ret <- []byte{}
 			return
-//			return PingInfo{}, fmt.Errorf("handshake write: %w", err)
 		}
 		buff.Reset()
-		buf.Reset()
 
 		r := bufio.NewReader(m.Conn)
 		z, err := r.ReadBytes('\n')
@@ -81,7 +85,6 @@ func (m Minecraft) pingQuery() (PingInfo, error) {
 				e <- fmt.Errorf("read byte buffer: %w", err)
 				ret <- []byte{}
 				return
-//				return PingInfo{}, fmt.Errorf("read byte buffer: %w", err)
 			}
 		}
 
@@ -96,14 +99,15 @@ func (m Minecraft) pingQuery() (PingInfo, error) {
 			if cerr != nil {
 				return PingInfo{}, fmt.Errorf("ping chan: %w", cerr)
 			}
-			err = json.Unmarshal(r[3:], &j)
+
+			err = json.Unmarshal(r[5:], &j)
 			if err != nil {
-				return PingInfo{}, fmt.Errorf("unmarshal json: %w", err)
+				return PingInfo{}, fmt.Errorf("unmarshal json: %w, %v", err, r)
 			}
 
 			return j, nil
 		case <- time.After(time.Duration(m.Timeout) * time.Second):
-			return PingInfo{}, fmt.Errorf("ping timeout")
+			return PingInfo{}, fmt.Errorf("ping timeout, length: %d", m.Timeout)
 	}
 
 	return j, nil

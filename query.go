@@ -90,7 +90,7 @@ func (m Minecraft) GetChallenge() (int32, error) {
 			}
 			return 0, fmt.Errorf("failed challenge")
 		case <-time.After(time.Duration(m.Timeout) * time.Second):
-			return 0, fmt.Errorf("challenge timeout")
+			return 0, fmt.Errorf("challenge timeout, length: %d", m.Timeout)
 	}
 
 	return 0, nil
@@ -154,7 +154,7 @@ func (m Minecraft) GetStatus(challenge int32) (QueryInfo, error) {
 			cerr := <- e
 			return si, cerr
 		case <- time.After(time.Duration(m.Timeout) * time.Second):
-			return QueryInfo{}, fmt.Errorf("status timeout\n")
+			return QueryInfo{}, fmt.Errorf("status timeout, length: %d\n", m.Timeout)
 	}
 
 	return QueryInfo{}, nil
