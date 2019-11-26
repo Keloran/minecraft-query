@@ -3,112 +3,161 @@ package minecraft
 import (
 	"bytes"
 	"encoding/binary"
-	//	"encoding/hex"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func (m Minecraft) Query() (interface{}, error) {
+func (m Minecraft) Query() (QueryInfo, error) {
 	if m.Conn == nil {
-		return nil, fmt.Errorf("no connection")
+		return QueryInfo{}, fmt.Errorf("no connection")
 	}
 
 	challenge, err := m.GetChallenge()
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		return QueryInfo{}, fmt.Errorf("query: %w", err)
 	}
-	status, err := m.GetStatus(challenge)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+	if challenge != 0 {
+		status, err := m.GetStatus(challenge)
+		if err != nil {
+			return QueryInfo{}, fmt.Errorf("query: %w", err)
+		}
+
+		return status, nil
 	}
 
-	return status, nil
+	return QueryInfo{}, nil
 }
 
 func (m Minecraft) GetChallenge() (int32, error) {
 	var buf bytes.Buffer
 	err := binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
 	if err != nil {
-	    return 0, fmt.Errorf("challenge magic: %w", err)
-    }
+		return 0, fmt.Errorf("challenge magic: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, []byte("\x09"))
 	if err != nil {
-	    return 0, fmt.Errorf("challenge type: %w", err)
-    }
+		return 0, fmt.Errorf("challenge type: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, []byte{01, 02, 03, 04})
 	if err != nil {
-	    return 0, fmt.Errorf("challange session: %w", err)
-    }
+		return 0, fmt.Errorf("challange session: %w", err)
+	}
 	_, err = m.Conn.Write(buf.Bytes())
 	if err != nil {
 		return 0, fmt.Errorf("challange write: %w", err)
 	}
 
-	out := make([]byte, 12)
-	_, err = io.ReadFull(m.Conn, out)
-	if err != nil {
-		if err != io.EOF {
-			return 0, fmt.Errorf("challenge read: %w", err)
+	challenge := make(chan int32, 1)
+	e := make(chan error, 1)
+
+	go func() {
+		out := make([]byte, 12)
+		_, err = io.ReadFull(m.Conn, out)
+		if err != nil {
+			if err != io.EOF {
+				e <- fmt.Errorf("challenge read: %w", err)
+				challenge <- int32(0)
+				return
+			}
 		}
+
+		preChal := out[5:]
+		chal := preChal
+		if chal[len(chal)-1] == byte(00) {
+			chal = chal[0 : len(chal)-2]
+		}
+
+		ret, err := strconv.Atoi(string(chal))
+		if err != nil {
+			e <- fmt.Errorf("challgne str to int: %w", err)
+			challenge <- int32(0)
+			return
+		}
+
+		challenge<- int32(ret)
+		e <- nil
+		return
+	}()
+
+	select {
+		case ret := <-challenge:
+			cerr := <- e
+			if ret != 0 {
+				return ret, cerr
+			}
+			return 0, fmt.Errorf("failed challenge")
+		case <-time.After(time.Duration(m.Timeout) * time.Second):
+			return 0, fmt.Errorf("challenge timeout")
 	}
 
-	preChal := out[5:]
-	chal := preChal
-	if chal[len(chal)-1] == byte(00) {
-		chal = chal[0 : len(chal)-2]
-	}
-
-	ret, err := strconv.Atoi(string(chal))
-	if err != nil {
-		return 0, fmt.Errorf("challenge str to int: %w", err)
-	}
-
-	return int32(ret), nil
+	return 0, nil
 }
 
-func (m Minecraft) GetStatus(challenge int32) (interface{}, error) {
+func (m Minecraft) GetStatus(challenge int32) (QueryInfo, error) {
 	var buf bytes.Buffer
 	err := binary.Write(&buf, binary.LittleEndian, []byte("\xFE\xFD"))
 	if err != nil {
-	    return nil, fmt.Errorf("getstatus magic: %w", err)
-    }
+		return QueryInfo{}, fmt.Errorf("getstatus magic: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, []byte("\x00"))
 	if err != nil {
-	    return nil, fmt.Errorf("getstatus type: %w", err)
-    }
+		return QueryInfo{}, fmt.Errorf("getstatus type: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, []byte{01, 02, 03, 04})
 	if err != nil {
-	    return nil, fmt.Errorf("getstatus session: %w", err)
-    }
+		return QueryInfo{}, fmt.Errorf("getstatus session: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, challenge)
 	if err != nil {
-	    return nil, fmt.Errorf("getstatus challange: %w", err)
-    }
+		return QueryInfo{}, fmt.Errorf("getstatus challange: %w", err)
+	}
 	err = binary.Write(&buf, binary.BigEndian, []byte("\x00\x00\x00\x00"))
 	if err != nil {
-	    return nil, fmt.Errorf("getstatus fullstat: %w", err)
-    }
+		return QueryInfo{}, fmt.Errorf("getstatus fullstat: %w", err)
+	}
 	_, err = m.Conn.Write(buf.Bytes())
 	if err != nil {
-		return "", fmt.Errorf("status write: %w", err)
+		return QueryInfo{}, fmt.Errorf("status write: %w", err)
 	}
 
-	out := make([]byte, 1024)
-	_, err = io.ReadAtLeast(m.Conn, out, 5)
-	if err != nil {
-		if err != io.EOF {
-			return nil, fmt.Errorf("Status Read: %w", err)
+	ret := make(chan QueryInfo, 1)
+	e := make(chan error, 1)
+
+	go func() {
+		out := make([]byte, 1024)
+		_, err = io.ReadAtLeast(m.Conn, out, 5)
+		if err != nil {
+			if err != io.EOF {
+				e <- fmt.Errorf("status read: %w", err)
+				ret <- QueryInfo{}
+				return
+			}
 		}
+
+		si, err := getServerInfo(out[16:])
+		if err != nil {
+			e <- fmt.Errorf("status serverinfo: %w", err)
+			ret <- QueryInfo{}
+			return
+		}
+		
+		e <- nil
+		ret <- si
+		return
+	}()
+
+	select {
+		case si := <- ret:
+			cerr := <- e
+			return si, cerr
+		case <- time.After(time.Duration(m.Timeout) * time.Second):
+			return QueryInfo{}, fmt.Errorf("status timeout\n")
 	}
 
-	si, err := getServerInfo(out[16:])
-	if err != nil {
-		return nil, fmt.Errorf("status serverinfo: %w", err)
-	}
-
-	return si, nil
+	return QueryInfo{}, nil
 }
 
 func getServerInfo(stat []byte) (QueryInfo, error) {

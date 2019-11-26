@@ -87,16 +87,15 @@ func ip2long(ip string) uint32 {
 	var long uint32
 	err := binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
 	if err != nil {
-	    fmt.Printf("ip2long read: %v", err)
-    }
+		fmt.Printf("ip2long read: %v", err)
+	}
 	return long
 }
 
 func (m Minecraft) ConnectTCP() (Minecraft, error) {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.Address, m.Port), time.Duration(m.Timeout)*time.Second)
 	if err != nil {
-		fmt.Printf("connect: %v, %v\n", m, err)
-		return m, errors.New("invalid address")
+		return m, fmt.Errorf("connection timeout")
 	}
 	m.Conn = conn
 
